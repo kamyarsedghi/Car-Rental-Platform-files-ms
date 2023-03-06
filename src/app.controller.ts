@@ -16,4 +16,13 @@ export class AppController {
     console.log('data', data);
     channel.ack(orginalMessage);
   }
+
+  @MessagePattern('save-to-file')
+  async saveToFile(@Payload() data: any, @Ctx() context: RmqContext) {
+    const channel = context.getChannelRef();
+    const orginalMessage = context.getMessage();
+    const result = this.appService.saveToFile(data);
+    channel.ack(orginalMessage);
+    return result;
+  }
 }
