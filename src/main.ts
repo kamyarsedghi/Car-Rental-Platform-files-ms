@@ -9,7 +9,7 @@ async function bootstrap() {
         transport: Transport.RMQ,
         options: {
             urls: ['amqp://user:password@localhost:5672'],
-            queue: 'CloudRMQ',
+            queue: 'the-main-queue',
             // false = manual acknowledgement; true = automatic acknowledgment
             noAck: false,
             // Get one by one
