@@ -1,21 +1,23 @@
-import { Controller, Get, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Ip, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { MessagePattern, RmqContext, Ctx, Payload } from '@nestjs/microservices';
 import { AppService } from './app.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { multerOptions } from './utils/multer/multer.options';
+import { LoggingInterceptor } from './utils/logging.interceptor';
 @Controller()
 export class AppController {
     constructor(private readonly appService: AppService) {}
 
     @Get()
-    getHello(): string {
-        return 'Files Microservice is functional.';
+    @UseInterceptors(LoggingInterceptor)
+    getHello(@Ip() ip: string): string {
+        return `Files Microservice is functional. IP: ${ip}`;
     }
 
     @UseInterceptors(FileInterceptor('file', multerOptions))
     @Post('import-cars')
-    async addCars(@UploadedFile() file: Express.Multer.File): Promise<void> {
-        this.appService.addCars(file);
+    async addCars(@UploadedFile() file: Express.Multer.File): Promise<any> {
+        return await this.appService.addCars(file);
     }
 
     @MessagePattern('save-to-file')

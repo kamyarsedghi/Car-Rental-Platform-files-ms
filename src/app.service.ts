@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -51,38 +51,44 @@ export class AppService {
         return { Error: 'Could not save into file' };
     }
 
-    async addCars(file: Express.Multer.File): Promise<void> {
+    async addCars(file: Express.Multer.File): Promise<any> {
         try {
             let list: string[] = [];
             const readableStream = fs.createReadStream(file.path as string);
-            readableStream
-                .pipe(csv())
-                .on('data', (row: string) => {
-                    list.push(row);
-                    if (list.length === 100) {
-                        // csv().pause();
-                        this.client
-                            .send('import-cars-from-ms', { list, done: false })
-                            .toPromise()
-                            .catch(err => console.log(err));
-                        console.log('list:', list.length);
-                        list = [];
-                    }
-                })
-                .on('end', async () => {
-                    this.client
-                        .send('import-cars-from-ms', { list, done: true })
-                        .toPromise()
-                        .then(res => console.log('Response:', res.status))
-                        .catch(err => console.log(err));
-                    fs.unlink(file.path, () => console.log('import ended'));
-                    console.log('CSV file successfully processed');
-                })
-                .on('error', error => {
-                    console.log('CSV error:', error);
-                });
+
+            const tmp = await new Promise((resolve, reject) => {
+                readableStream
+                    .pipe(csv())
+                    .on('data', (row: string) => {
+                        list.push(row);
+                        if (list.length === 100) {
+                            this.client
+                                .send('import-cars-from-ms', { list, done: false })
+                                .toPromise()
+                                .catch(err => console.log(err));
+                            console.log('list:', list.length);
+                            list = [];
+                        }
+                    })
+                    .on('end', async () => {
+                        try {
+                            const result = await this.client.send('import-cars-from-ms', { list, done: true }).toPromise();
+                            result.status === 'Import DONE' ? (console.log('Import DONE'), fs.unlink(file.path, () => console.log('Import ended'))) : console.log('Import ERROR');
+                            resolve({ status: 'Import DONE' });
+                        } catch (err) {
+                            console.log(err);
+                            reject(err);
+                        }
+                    })
+                    .on('error', error => {
+                        console.log('CSV error:', error);
+                        reject(error);
+                    });
+            });
+            return await tmp;
         } catch (error) {
             console.log(error);
+            throw new InternalServerErrorException(error.message);
         }
     }
 }
